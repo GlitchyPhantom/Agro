@@ -1,0 +1,9 @@
+['Corn_(maize)_Common_rust', 
+'Corn_(maize)_blight',
+ 'Corn_(maize)_healthy', 
+'Potato_early_blight',
+ 'Potato_healthy', 
+'Potato_late_blight',
+ 'Tomato_early_blight',
+ 'Tomato_healthy', 
+'Tomato_late_blight']

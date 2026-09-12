@@ -1,0 +1,102 @@
+# ==========================================
+# Environment & Secrets
+# ==========================================
+.env
+.env.*
+!.env.example
+*.local
+
+# ==========================================
+# Node / Dependencies (Front & AgrointelMobile)
+# ==========================================
+node_modules/
+package-lock.json.bak
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# ==========================================
+# Python & Virtual Environments (Back)
+# ==========================================
+venv/
+env/
+ENV/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+*.ckpt
+
+# ==========================================
+# Frontend Web Build Output (Front)
+# ==========================================
+dist/
+dist-ssr/
+out/
+.next/
+
+# ==========================================
+# Expo & React Native (AgrointelMobile)
+# ==========================================
+.expo/
+.expo-shared/
+web-build/
+expo-env.d.ts
+.metro-health-check*
+android/
+ios/
+
+# Native & Signing Keys
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.keystore
+*.pem
+
+# ==========================================
+# Logs & Databases
+# ==========================================
+*.log
+logs/
+*.sqlite
+*.sqlite3
+*.db
+
+# ==========================================
+# OS & IDE Files
+# ==========================================
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.claude/
