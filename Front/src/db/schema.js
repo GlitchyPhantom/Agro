@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, real, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, real, jsonb, timestamp, numeric, date } from "drizzle-orm/pg-core";
 
 // ── User Profiles ────────────────────────────────────────────────────────────
 export const profiles = pgTable("profiles", {
@@ -36,3 +36,34 @@ export const chatMessages = pgTable("chat_messages", {
   language: text("language").default("en"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// ── Farm Plots ───────────────────────────────────────────────────────────────
+export const farmPlots = pgTable("farm_plots", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").references(() => profiles.id, { onDelete: "cascade" }),
+  plotName: text("plot_name").notNull(),
+  area: numeric("area").notNull(),
+  areaUnit: text("area_unit").default("Acres").notNull(),
+  crop: text("crop").notNull(),
+  sowingDate: date("sowing_date"),
+  soilType: text("soil_type"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ── Farm Inventory ───────────────────────────────────────────────────────────
+export const farmInventory = pgTable("farm_inventory", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").references(() => profiles.id, { onDelete: "cascade" }),
+  itemName: text("item_name").notNull(),
+  category: text("category").notNull(), // Fungicide, Pesticide, Fertilizer, Insecticide, etc.
+  quantity: numeric("quantity").default("0").notNull(),
+  unit: text("unit").default("ml").notNull(),
+  activeIngredient: text("active_ingredient"),
+  expiryDate: date("expiry_date"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+

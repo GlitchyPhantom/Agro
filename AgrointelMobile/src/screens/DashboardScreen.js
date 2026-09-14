@@ -13,11 +13,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { useDrawer } from '../context/DrawerContext';
 import { API_BASE_URL } from '../config';
 import colors from '../theme/colors';
 
 export default function DashboardScreen({ navigation }) {
   const { user, signOut } = useAuth();
+  const { openDrawer } = useDrawer();
   const [stats, setStats] = useState(null);
   const [recentScans, setRecentScans] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -112,13 +114,23 @@ export default function DashboardScreen({ navigation }) {
 
       {/* Top Header */}
       <View style={styles.header}>
-        <View style={styles.headerBrand}>
-          <View style={styles.logoIcon}>
-            <Ionicons name="leaf" size={20} color="#fff" />
+        <View style={styles.headerBrandWrap}>
+          <TouchableOpacity
+            style={styles.hamburgerBtn}
+            onPress={openDrawer}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="menu-outline" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <View style={styles.headerBrand}>
+            <View style={styles.logoIcon}>
+              <Ionicons name="leaf" size={18} color="#fff" />
+            </View>
+            <Text style={styles.headerTitle}>
+              Agro<Text style={styles.headerAccent}>Intel</Text>
+            </Text>
           </View>
-          <Text style={styles.headerTitle}>
-            Agro<Text style={styles.headerAccent}>Intel</Text>
-          </Text>
         </View>
 
         <TouchableOpacity style={styles.signOutBtn} onPress={signOut} activeOpacity={0.7}>
@@ -182,6 +194,32 @@ export default function DashboardScreen({ navigation }) {
             </View>
             <Text style={styles.actionTitle}>Agri Chat</Text>
             <Text style={styles.actionDesc}>Ask AI crop advisor</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={[styles.actionRow, { marginTop: -14 }]}>
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => navigation.navigate('FarmPlots')}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.actionIconWrap, { backgroundColor: 'rgba(52, 211, 153, 0.15)' }]}>
+              <Ionicons name="location-outline" size={24} color="#34D399" />
+            </View>
+            <Text style={styles.actionTitle}>Farm Plots</Text>
+            <Text style={styles.actionDesc}>Manage land & crop health</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => navigation.navigate('Inventory')}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.actionIconWrap, { backgroundColor: 'rgba(245, 158, 11, 0.15)' }]}>
+              <Ionicons name="cube-outline" size={24} color="#F59E0B" />
+            </View>
+            <Text style={styles.actionTitle}>Shed Stocks</Text>
+            <Text style={styles.actionDesc}>Medicines & fertilizers</Text>
           </TouchableOpacity>
         </View>
 
@@ -276,10 +314,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.default,
+  },
+  headerBrandWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  hamburgerBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#111A15',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: '#1E2C24',
   },
   headerBrand: {
     flexDirection: 'row',

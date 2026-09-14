@@ -8,7 +8,12 @@ import DashboardScreen from '../screens/DashboardScreen';
 import ScannerScreen from '../screens/ScannerScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import ChatScreen from '../screens/ChatScreen';
+import FarmPlotsScreen from '../screens/FarmPlotsScreen';
+import InventoryScreen from '../screens/InventoryScreen';
+import VoiceReaderScreen from '../screens/VoiceReaderScreen';
 import FloatingChatBubble from '../components/FloatingChatBubble';
+import SidebarDrawer from '../components/SidebarDrawer';
+import { DrawerProvider } from '../context/DrawerContext';
 import colors from '../theme/colors';
 
 const Tab = createBottomTabNavigator();
@@ -65,21 +70,50 @@ function MainTabs({ navigation }) {
 
 export default function AppNavigator() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="MainTabs" component={MainTabs} />
-      <Stack.Screen
-        name="Chat"
-        component={ChatScreen}
-        options={{
-          animation: 'slide_from_bottom',
-        }}
-      />
-    </Stack.Navigator>
+    <DrawerProvider>
+      <View style={styles.container}>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="MainTabs" component={MainTabs} />
+          <Stack.Screen
+            name="FarmPlots"
+            component={FarmPlotsScreen}
+            options={{
+              animation: 'slide_from_right',
+            }}
+          />
+          <Stack.Screen
+            name="Inventory"
+            component={InventoryScreen}
+            options={{
+              animation: 'slide_from_right',
+            }}
+          />
+          <Stack.Screen
+            name="VoiceReader"
+            component={VoiceReaderScreen}
+            options={{
+              animation: 'slide_from_right',
+            }}
+          />
+          <Stack.Screen
+            name="Chat"
+            component={ChatScreen}
+            options={{
+              animation: 'slide_from_bottom',
+            }}
+          />
+        </Stack.Navigator>
+
+        {/* Global Hamburger Sidebar Drawer */}
+        <SidebarDrawer />
+      </View>
+    </DrawerProvider>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#080C0A',
   },
 });

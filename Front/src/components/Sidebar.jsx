@@ -10,6 +10,8 @@ import {
   LogOut,
   X,
   User,
+  MapPin,
+  Package,
 } from "lucide-react";
 
 export default function Sidebar({ mobileOpen, setMobileOpen }) {
@@ -19,13 +21,29 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
 
   const links = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { to: "/farm", label: "Farm Plots", icon: MapPin },
+    { to: "/inventory", label: "Shed Inventory", icon: Package },
     { to: "/scan", label: "Scan Plant", icon: ScanLine },
     { to: "/history", label: "Scan History", icon: Clock },
     { to: "/chat", label: "AI Advisor", icon: MessageCircle },
   ];
 
+
   const isActive = (path) => location.pathname === path;
-  const userName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User";
+  const getCleanName = () => {
+    const raw = user?.user_metadata?.full_name || user?.user_metadata?.name;
+    if (raw && typeof raw === "string" && raw.toLowerCase() !== "null" && raw.trim() !== "") {
+      return raw.trim();
+    }
+    if (user?.email && typeof user.email === "string" && user.email.toLowerCase() !== "null") {
+      const namePart = user.email.split("@")[0];
+      if (namePart && namePart.toLowerCase() !== "null") {
+        return namePart;
+      }
+    }
+    return "User";
+  };
+  const userName = getCleanName();
 
   return (
     <>

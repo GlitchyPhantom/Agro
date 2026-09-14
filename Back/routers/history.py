@@ -41,12 +41,16 @@ async def get_scan(
 @router.delete("/history/{scan_id}")
 async def remove_scan(
     scan_id: str,
-    x_user_id: str = Header(..., alias="X-User-Id"),
+    x_user_id: str = Header(None, alias="X-User-Id"),
+    authorization: str = Header(None, alias="Authorization"),
 ):
     """Delete a scan record."""
     try:
-        await delete_scan(scan_id, x_user_id)
-        return {"message": "Scan deleted successfully"}
+        token = None
+        if authorization and authorization.startswith("Bearer "):
+            token = authorization.split("Bearer ")[1].strip()
+        deleted = await delete_scan(scan_id, x_user_id, token)
+        return {"message": "Scan deleted successfully", "deleted": deleted}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

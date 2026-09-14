@@ -5,7 +5,7 @@ AI-Based Plant Disease Detection and Advisory System
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import predict, chat, history, sarvam
+from routers import predict, chat, history, sarvam, resources
 
 app = FastAPI(
     title="AgroIntel API",
@@ -27,6 +27,8 @@ app.include_router(predict.router)
 app.include_router(chat.router)
 app.include_router(history.router)
 app.include_router(sarvam.router)
+app.include_router(resources.router)
+
 
 
 @app.get("/")

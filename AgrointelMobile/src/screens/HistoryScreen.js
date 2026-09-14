@@ -14,11 +14,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { useDrawer } from '../context/DrawerContext';
 import { API_BASE_URL } from '../config';
 import colors from '../theme/colors';
 
 export default function HistoryScreen({ navigation }) {
   const { user } = useAuth();
+  const { openDrawer } = useDrawer();
   const [scans, setScans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -80,9 +82,19 @@ export default function HistoryScreen({ navigation }) {
 
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerBrand}>
-          <Ionicons name="time" size={22} color={colors.accent.bright} />
-          <Text style={styles.headerTitle}>Scan History</Text>
+        <View style={styles.headerLeftWrap}>
+          <TouchableOpacity
+            style={styles.hamburgerBtn}
+            onPress={openDrawer}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="menu-outline" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <View style={styles.headerBrand}>
+            <Ionicons name="time" size={20} color={colors.accent.bright} />
+            <Text style={styles.headerTitle}>History</Text>
+          </View>
         </View>
         <TouchableOpacity
           style={styles.newScanBtn}
@@ -236,10 +248,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.default,
+  },
+  headerLeftWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  hamburgerBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#111A15',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: '#1E2C24',
   },
   headerBrand: {
     flexDirection: 'row',

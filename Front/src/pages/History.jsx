@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { Link } from "react-router-dom";
+import { supabase } from "../lib/supabase";
 import {
   Clock,
   Trash2,
@@ -12,6 +13,7 @@ import {
   ArrowRight,
   ChevronDown,
   ChevronUp,
+  Package,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -28,34 +30,117 @@ export default function History() {
   }, [user]);
 
   const fetchHistory = async () => {
+    if (!user?.id) {
+      setScans([]);
+      setLoading(false);
+      return;
+    }
+
     try {
-      const res = await fetch(`${API}/api/history`, {
-        headers: { "X-User-Id": user.id },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setScans(data.scans || []);
+      // 1. Try FastAPI backend strictly with user's ID and Bearer token
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const headers = { "X-User-Id": user.id };
+        if (sessionData?.session?.access_token) {
+          headers["Authorization"] = `Bearer ${sessionData.session.access_token}`;
+        }
+
+        const res = await fetch(`${API}/api/history`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          // Strictly isolate to this user's scans (even if empty [] for new accounts)
+          setScans(data.scans || []);
+          setLoading(false);
+          return;
+        }
+      } catch (backendErr) {
+        console.warn("Backend /api/history fetch failed, falling back to direct Supabase:", backendErr);
+      }
+
+      // 2. Direct Supabase query ONLY if backend is unavailable, STRICTLY isolated to this user
+      const { data: dbScans, error } = await supabase
+        .from("detections")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (!error && dbScans) {
+        const formatted = dbScans.map((s) => ({
+          id: s.id,
+          image_url: s.image_url,
+          disease: s.disease_name,
+          confidence: s.confidence,
+          severity: typeof s.advisory === "object" ? s.advisory?.severity || "moderate" : "moderate",
+          is_healthy: (s.disease_name || "").toLowerCase().includes("healthy"),
+          advisory: typeof s.advisory === "object" ? s.advisory?.text || JSON.stringify(s.advisory) : s.advisory,
+          predictions: s.top_predictions,
+          location: s.location,
+          scanned_at: s.created_at,
+        }));
+        setScans(formatted);
+      } else {
+        setScans([]);
       }
     } catch (e) {
-      console.error(e);
+      console.error("fetchHistory error:", e);
+      setScans([]);
     } finally {
       setLoading(false);
     }
   };
 
+
   const handleDelete = async (scanId) => {
-    if (!confirm("Delete this scan record?")) return;
+    if (!confirm("Are you sure you want to permanently delete this scan record from the database?")) return;
     try {
-      const res = await fetch(`${API}/api/history/${scanId}`, {
-        method: "DELETE",
-        headers: { "X-User-Id": user.id },
-      });
-      if (res.ok) {
-        setScans((prev) => prev.filter((s) => s.id !== scanId));
-        toast.success("Scan deleted");
+      let deletedFromDb = false;
+
+      // 1. Direct Supabase deletion (uses the browser's active Supabase session with RLS auth.uid())
+      try {
+        const { data: sbData, error: sbError } = await supabase
+          .from("detections")
+          .delete()
+          .eq("id", scanId)
+          .select();
+
+        if (!sbError && sbData && sbData.length > 0) {
+          deletedFromDb = true;
+          console.log("[Supabase] Deleted detection successfully:", sbData);
+        } else if (sbError) {
+          console.warn("[Supabase Direct Delete Error]:", sbError);
+        }
+      } catch (sbEx) {
+        console.warn("[Supabase Delete Exception]:", sbEx);
       }
+
+      // 2. Also invoke backend API with Bearer token & User ID for synced cleanup
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const headers = { "X-User-Id": user?.id || "" };
+        if (sessionData?.session?.access_token) {
+          headers["Authorization"] = `Bearer ${sessionData.session.access_token}`;
+        }
+
+        const res = await fetch(`${API}/api/history/${scanId}`, {
+          method: "DELETE",
+          headers,
+        });
+        if (res.ok) {
+          const resJson = await res.json().catch(() => ({}));
+          if (resJson.deleted) {
+            deletedFromDb = true;
+          }
+        }
+      } catch (backendEx) {
+        console.warn("[Backend Delete Sync Exception]:", backendEx);
+      }
+
+      // 3. Update UI state
+      setScans((prev) => prev.filter((s) => s.id !== scanId));
+      toast.success("Scan permanently deleted from database");
     } catch (e) {
-      toast.error("Failed to delete");
+      console.error("Delete failed:", e);
+      toast.error("Failed to delete scan from database");
     }
   };
 
@@ -160,12 +245,66 @@ export default function History() {
                 {/* Expanded Detail */}
                 {expandedId === scan.id && (
                   <div className="px-5 pb-5 pt-0 border-t border-[#2a3a34] animate-fade-in">
-                    {scan.advisory && (
-                      <div className="mt-4 p-4 rounded-xl bg-[#0a0f0d]/50">
-                        <h4 className="text-sm font-semibold text-green-400 mb-2">Advisory</h4>
-                        <p className="text-sm text-gray-300 whitespace-pre-wrap">{scan.advisory}</p>
-                      </div>
-                    )}
+                    {scan.advisory && (() => {
+                      let parsed = null;
+                      if (typeof scan.advisory === "object") parsed = scan.advisory;
+                      else if (typeof scan.advisory === "string") {
+                        try {
+                          const cleaned = scan.advisory.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+                          parsed = JSON.parse(cleaned);
+                        } catch {}
+                      }
+
+                      const pres = parsed?.personalized_prescription;
+
+                      return (
+                        <div className="mt-4 space-y-3">
+                          {pres && (
+                            <div className={`p-4 rounded-xl border ${
+                              pres.has_in_stock_remedy
+                                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-200"
+                                : "bg-amber-500/10 border-amber-500/30 text-amber-200"
+                            }`}>
+                              <div className="flex items-center justify-between mb-1.5 font-semibold text-xs uppercase tracking-wider">
+                                <span>{pres.has_in_stock_remedy ? "🟢 Farm Shed In-Stock Prescription" : "🛒 Market Purchase Recommendation"}</span>
+                                {pres.matched_items?.length > 0 && (
+                                  <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
+                                    {pres.matched_items.join(", ")}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm leading-relaxed text-gray-200 whitespace-pre-wrap">
+                                {pres.has_in_stock_remedy ? pres.in_stock_instructions : pres.market_recommendation}
+                              </p>
+                            </div>
+                          )}
+
+                          <div className="p-4 rounded-xl bg-[#0a0f0d]/60 border border-[#2a3a34]/60">
+                            <h4 className="text-sm font-semibold text-green-400 mb-2">Advisory Details</h4>
+                            {parsed && parsed.cause ? (
+                              <div className="space-y-2 text-sm text-gray-300">
+                                <p><strong className="text-gray-200">Cause:</strong> {parsed.cause}</p>
+                                {parsed.chemical_treatment && (
+                                  <div>
+                                    <strong className="text-gray-200">Chemical Treatment:</strong>
+                                    <ul className="list-disc list-inside mt-1 space-y-1 text-gray-400">
+                                      {Array.isArray(parsed.chemical_treatment)
+                                        ? parsed.chemical_treatment.map((t, idx) => <li key={idx}>{t}</li>)
+                                        : <li>{parsed.chemical_treatment}</li>}
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-gray-300 whitespace-pre-wrap">
+                                {typeof scan.advisory === "string" ? scan.advisory : JSON.stringify(scan.advisory, null, 2)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
 
                     {scan.predictions && (
                       <div className="mt-4">

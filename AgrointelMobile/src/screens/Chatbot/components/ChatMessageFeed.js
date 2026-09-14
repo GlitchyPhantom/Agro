@@ -19,6 +19,8 @@ export default function ChatMessageFeed({
   onSelectSuggestion,
   onSpeak,
   playingAudioId,
+  audioLoadingId,
+  pausedAudioId,
   feedback = {},
   onToggleFeedback,
   copiedId,
@@ -100,11 +102,15 @@ export default function ChatMessageFeed({
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 activeOpacity={0.7}
               >
-                <Ionicons
-                  name={playingAudioId === item.id ? 'stop-circle' : 'volume-medium-outline'}
-                  size={20}
-                  color={playingAudioId === item.id ? '#10B981' : '#94A3B8'}
-                />
+                {audioLoadingId === item.id ? (
+                  <ActivityIndicator size="small" color="#10B981" />
+                ) : playingAudioId === item.id ? (
+                  <Ionicons name="pause-circle" size={20} color="#10B981" />
+                ) : pausedAudioId === item.id ? (
+                  <Ionicons name="play-circle" size={20} color="#10B981" />
+                ) : (
+                  <Ionicons name="volume-medium-outline" size={20} color="#94A3B8" />
+                )}
               </TouchableOpacity>
             </View>
 

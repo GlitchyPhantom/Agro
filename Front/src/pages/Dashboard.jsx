@@ -11,6 +11,8 @@ import {
   CheckCircle,
   TrendingUp,
   ArrowRight,
+  MapPin,
+  Package,
 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -30,6 +32,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function fetchData() {
+      if (!user?.id) {
+        setStats(null);
+        setRecentScans([]);
+        setLoading(false);
+        return;
+      }
       try {
         const [statsRes, histRes] = await Promise.all([
           fetch(`${API}/api/stats`, {
@@ -108,60 +116,73 @@ export default function Dashboard() {
                     <Icon className="w-5 h-5 text-green-400" />
                   </div>
                 </div>
-                <div className="text-2xl font-bold text-white mb-1">
-                  {loading ? "..." : card.value}
-                </div>
-                <div className="text-sm text-gray-400">{card.label}</div>
+                <p className="text-sm text-gray-400 mb-1">{card.label}</p>
+                <p className="font-[Outfit] text-3xl font-bold text-white">{loading ? "..." : card.value}</p>
               </div>
             );
           })}
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
           <Link
             to="/scan"
-            className="glass-card p-6 flex items-center gap-4 group animate-slide-up"
+            className="glass-card p-6 flex items-center gap-4 group animate-slide-up hover:border-emerald-500/40 transition-all"
             style={{ animationDelay: "0.1s" }}
           >
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-500/20 group-hover:scale-110 transition-transform">
-              <ScanLine className="w-7 h-7 text-white" />
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-500/20 group-hover:scale-105 transition-transform flex-shrink-0">
+              <ScanLine className="w-6 h-6 text-white" />
             </div>
-            <div className="flex-1">
-              <h3 className="font-[Outfit] font-semibold text-white text-lg">Scan Plant</h3>
-              <p className="text-sm text-gray-400">Upload a leaf image to detect diseases</p>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-[Outfit] font-semibold text-white text-base truncate">Scan Plant</h3>
+              <p className="text-xs text-gray-400 truncate">Detect diseases & dose</p>
             </div>
-            <ArrowRight className="w-5 h-5 text-gray-500 group-hover:text-green-400 transition-colors" />
+            <ArrowRight className="w-4 h-4 text-gray-500 group-hover:text-green-400 transition-colors flex-shrink-0" />
+          </Link>
+
+          <Link
+            to="/farm"
+            className="glass-card p-6 flex items-center gap-4 group animate-slide-up hover:border-teal-500/40 transition-all"
+            style={{ animationDelay: "0.15s" }}
+          >
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-teal-500/20 group-hover:scale-105 transition-transform flex-shrink-0">
+              <MapPin className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-[Outfit] font-semibold text-white text-base truncate">Farm Plots</h3>
+              <p className="text-xs text-gray-400 truncate">Manage land & crops</p>
+            </div>
+            <ArrowRight className="w-4 h-4 text-gray-500 group-hover:text-teal-400 transition-colors flex-shrink-0" />
+          </Link>
+
+          <Link
+            to="/inventory"
+            className="glass-card p-6 flex items-center gap-4 group animate-slide-up hover:border-amber-500/40 transition-all"
+            style={{ animationDelay: "0.2s" }}
+          >
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/20 group-hover:scale-105 transition-transform flex-shrink-0">
+              <Package className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-[Outfit] font-semibold text-white text-base truncate">Shed Inventory</h3>
+              <p className="text-xs text-gray-400 truncate">Medicines & fertilizers</p>
+            </div>
+            <ArrowRight className="w-4 h-4 text-gray-500 group-hover:text-amber-400 transition-colors flex-shrink-0" />
           </Link>
 
           <Link
             to="/chat"
-            className="glass-card p-6 flex items-center gap-4 group animate-slide-up"
-            style={{ animationDelay: "0.2s" }}
+            className="glass-card p-6 flex items-center gap-4 group animate-slide-up hover:border-cyan-500/40 transition-all"
+            style={{ animationDelay: "0.25s" }}
           >
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 group-hover:scale-110 transition-transform">
-              <MessageCircle className="w-7 h-7 text-white" />
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 group-hover:scale-105 transition-transform flex-shrink-0">
+              <MessageCircle className="w-6 h-6 text-white" />
             </div>
-            <div className="flex-1">
-              <h3 className="font-[Outfit] font-semibold text-white text-lg">AI Chat</h3>
-              <p className="text-sm text-gray-400">Ask farming questions to AI assistant</p>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-[Outfit] font-semibold text-white text-base truncate">AI Chat</h3>
+              <p className="text-xs text-gray-400 truncate">Ask farming questions</p>
             </div>
-            <ArrowRight className="w-5 h-5 text-gray-500 group-hover:text-cyan-400 transition-colors" />
-          </Link>
-
-          <Link
-            to="/history"
-            className="glass-card p-6 flex items-center gap-4 group animate-slide-up"
-            style={{ animationDelay: "0.3s" }}
-          >
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-500/20 group-hover:scale-110 transition-transform">
-              <Clock className="w-7 h-7 text-white" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-[Outfit] font-semibold text-white text-lg">History</h3>
-              <p className="text-sm text-gray-400">View past scans and track trends</p>
-            </div>
-            <ArrowRight className="w-5 h-5 text-gray-500 group-hover:text-purple-400 transition-colors" />
+            <ArrowRight className="w-4 h-4 text-gray-500 group-hover:text-cyan-400 transition-colors flex-shrink-0" />
           </Link>
         </div>
 

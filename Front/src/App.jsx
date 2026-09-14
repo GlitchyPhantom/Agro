@@ -8,8 +8,10 @@ import Dashboard from "./pages/Dashboard";
 import Scanner from "./pages/Scanner";
 import History from "./pages/History";
 import Chat from "./pages/Chat";
+import FarmProfile from "./pages/FarmProfile";
+import Inventory from "./pages/Inventory";
 import Sidebar from "./components/Sidebar";
-import Header from "./components/Header";
+import { Menu } from "lucide-react";
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -44,8 +46,6 @@ export default function App() {
     );
   }
 
-  const isChatPage = location.pathname === "/chat";
-
   return (
     <div className="min-h-screen bg-[#0a0f0d] flex">
       <Sidebar
@@ -53,10 +53,18 @@ export default function App() {
         setMobileOpen={setMobileOpen}
       />
 
-      <div className="flex-1 flex flex-col min-w-0 md:ml-16 transition-all duration-300">
-        {!isChatPage && <Header setMobileOpen={setMobileOpen} />}
+      {/* Floating mobile menu button */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="md:hidden fixed top-3.5 right-3.5 z-40 p-2.5 rounded-xl bg-[#111916]/90 border border-[#2a3a34] text-gray-400 hover:text-white backdrop-blur-md shadow-lg shadow-black/60 transition-colors"
+        aria-label="Open menu"
+      >
+        <Menu className="w-5 h-5" />
+      </button>
 
+      <div className="flex-1 flex flex-col min-w-0 md:ml-16 transition-all duration-300">
         <main className="flex-1 bg-[#0a0f0d]">
+
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/login" element={<Navigate to="/dashboard" replace />} />
@@ -66,6 +74,22 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/farm"
+              element={
+                <ProtectedRoute>
+                  <FarmProfile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/inventory"
+              element={
+                <ProtectedRoute>
+                  <Inventory />
                 </ProtectedRoute>
               }
             />

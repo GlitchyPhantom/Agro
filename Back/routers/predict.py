@@ -2,10 +2,10 @@
 Predict Router - Disease detection via image upload.
 """
 
-from fastapi import APIRouter, UploadFile, File, Header, HTTPException
+from fastapi import APIRouter, UploadFile, File, Header, Form, HTTPException
 from services.model_service import predict_disease
 from services.groq_service import get_disease_advisory
-from services.supabase_service import upload_image, save_scan
+from services.supabase_service import upload_image, save_scan, get_user_plots, get_plot_by_id, get_user_inventory
 
 router = APIRouter(prefix="/api", tags=["prediction"])
 
@@ -13,12 +13,15 @@ router = APIRouter(prefix="/api", tags=["prediction"])
 @router.post("/predict")
 async def predict(
     file: UploadFile = File(...),
+    plot_id: str = Form(None),
     x_user_id: str = Header(None, alias="X-User-Id"),
     x_location: str = Header(None, alias="X-Location"),
+    x_plot_id: str = Header(None, alias="X-Plot-Id"),
 ):
     """
     Upload a plant leaf image and get disease prediction with advisory.
-    Returns top-3 predictions, severity level, and treatment recommendations.
+    Returns top-3 predictions, severity level, and treatment recommendations
+    tailored to the farmer's plot area and available inventory.
     """
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
@@ -31,15 +34,34 @@ async def predict(
     # Run CNN prediction
     result = predict_disease(image_bytes)
 
+    # Fetch plot and inventory for personalized advisory if user is authenticated
+    active_plot_id = plot_id or x_plot_id
+    plot_info = None
+    user_inventory = []
+
+    if x_user_id:
+        try:
+            if active_plot_id:
+                plot_info = await get_plot_by_id(active_plot_id, x_user_id)
+            if not plot_info:
+                # If no specific plot selected, check if user has a default plot
+                plots = await get_user_plots(x_user_id)
+                if plots and len(plots) > 0:
+                    plot_info = plots[0]
+            user_inventory = await get_user_inventory(x_user_id)
+        except Exception as err:
+            print(f"[Resource Fetch Warning]: {err}")
+
     # Get advisory from Groq LLM (only if disease detected)
     advisory = None
     if not result["is_healthy"]:
         try:
-            from services.groq_service import get_disease_advisory
             advisory = await get_disease_advisory(
                 disease=result["primary_disease"],
                 severity=result["severity"],
                 confidence=result["primary_confidence"],
+                plot_info=plot_info,
+                inventory=user_inventory,
             )
         except Exception as e:
             import traceback
@@ -48,6 +70,8 @@ async def predict(
             advisory = f"⚠️ Groq Advisory Error: {e}"
 
     result["advisory"] = advisory
+    result["plot_info"] = plot_info
+
 
     # Always upload image to Supabase storage bucket (works for guest & authenticated users)
     upload_user_id = x_user_id or "guest"

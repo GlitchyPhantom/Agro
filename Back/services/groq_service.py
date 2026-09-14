@@ -54,11 +54,20 @@ def _clean_response(text: str) -> str:
     return cleaned if cleaned else text
 
 
-ADVISORY_SYSTEM_PROMPT = f"""You are AgroIntel AI — an expert agricultural disease advisor.
+ADVISORY_SYSTEM_PROMPT = f"""You are AgroIntel AI — an expert agricultural disease advisor and farm resource management assistant.
 
 Known disease classes from the CNN model: {PLANT_CLASSES}
 
-When given a detected disease with severity, respond with EXACTLY this JSON-parseable structure:
+You provide personalized prescriptions based on:
+1. Detected Disease & Severity
+2. The Farmer's Specific Plot Area (e.g. 2.5 Acres, 1 Hectare, 3 Bigha)
+3. The Farmer's Shed Inventory (stored chemicals, fungicides, fertilizers, and medicines)
+
+When analyzing, check if any of the farmer's stored chemicals/medicines are effective against the disease.
+- If YES: Prioritize their in-stock remedy to save them money, calculating the exact quantity and water volume needed for their specific plot area.
+- If NO or stock is insufficient: Recommend the best commercial remedies and guide them to acquire them from the nearest local agro-input market.
+
+You must respond with EXACTLY this JSON-parseable structure:
 {{
   "disease_name": "...",
   "crop": "...",
@@ -67,10 +76,17 @@ When given a detected disease with severity, respond with EXACTLY this JSON-pars
   "organic_treatment": ["treatment 1", "treatment 2"],
   "chemical_treatment": ["treatment with dosage 1", "treatment with dosage 2"],
   "prevention": ["measure 1", "measure 2", "measure 3"],
-  "severity_note": "Brief note about the severity level"
+  "severity_note": "Brief note about the severity level",
+  "personalized_prescription": {{
+    "has_in_stock_remedy": true,
+    "matched_items": ["Item name from farmer inventory if matched"],
+    "in_stock_instructions": "Tailored step-by-step instructions using items from their shed, with calculated dosage for their plot area (e.g. 500g in 250L water).",
+    "market_needed": false,
+    "market_recommendation": "If no in-stock remedy or extra needed, name the best medicine to buy at the nearest market with dosage."
+  }}
 }}
 
-Keep language simple, practical, and farmer-friendly. Be specific about dosages.
+Keep language clear, practical, and farmer-friendly.
 Do NOT include thinking or reasoning tags. ONLY return the valid JSON string.
 """
 
@@ -113,14 +129,14 @@ CHAT_MODELS = [
 ]
 
 ADVISORY_MODELS = [
+    "qwen/qwen3.8-27b",
     "openai/gpt-oss-120b",
     "openai/gpt-oss-20b",
-    "qwen/qwen3.8-27b",
 ]
 
 
 def _normalize_odia_terms(text: str) -> str:
-    """Ensure standard agricultural terminology in Odia, specifically replacing 'ବିଆ' or 'ବୀଜ' with 'ବିହନ'."""
+    """Ensure standard agricultural terminology and clean punctuation in Odia for natural TTS audio."""
     if not text:
         return text
     # Direct replacements for common combinations
@@ -138,6 +154,13 @@ def _normalize_odia_terms(text: str) -> str:
     # Standalone replacements where appropriate
     text = re.sub(r'(?<![^\s\(\[,\.।])ବୀଜ(?![^\s\)\]\,\.।])', 'ବିହନ', text)
     text = re.sub(r'(?<![^\s\(\[,\.।])ବିଆ(?![^\s\)\]\,\.।])', 'ବିହନ', text)
+
+    # Remove English parenthetical words that degrade TTS (e.g. (seed), (fertilizer), (spray))
+    text = re.sub(r'\s*\([a-zA-Z\s]+\)', '', text)
+
+    # Convert Western periods following Odia text into Odia Purna Viram (।) for natural cadence
+    text = re.sub(r'([\u0B00-\u0B7F]+)\.(?!\d)', r'\1।', text)
+
     return text
 
 
@@ -175,20 +198,55 @@ def _format_chat_response(content: str, reasoning: str = "", language: str = "en
     return content
 
 
-async def get_disease_advisory(disease: str, severity: str, confidence: float) -> str:
-    """Get detailed treatment advisory for a detected disease using Groq LLM."""
+async def get_disease_advisory(
+    disease: str,
+    severity: str,
+    confidence: float,
+    plot_info: dict = None,
+    inventory: list = None,
+) -> str:
+    """Get detailed personalized treatment advisory for a detected disease using Groq LLM."""
     client = _get_client()
-    prompt = (
-        f"Detected Disease: {disease}\n"
-        f"Severity Level: {severity}\n"
-        f"Confidence Score: {confidence}%\n"
-        f"Provide detailed advisory for this disease."
+
+    # Build context prompt
+    prompt_lines = [
+        f"Detected Disease: {disease}",
+        f"Severity Level: {severity}",
+        f"Confidence Score: {confidence}%",
+    ]
+
+    if plot_info:
+        plot_name = plot_info.get("plot_name", "Primary Plot")
+        area = plot_info.get("area", 1.0)
+        unit = plot_info.get("area_unit", "Acres")
+        crop = plot_info.get("crop", "Unknown")
+        prompt_lines.append(f"Target Plot: '{plot_name}' ({area} {unit}, Crop: {crop})")
+    else:
+        prompt_lines.append("Target Plot: Not specified (Provide standard dosage per 1 Acre as reference)")
+
+    if inventory and len(inventory) > 0:
+        inv_desc = []
+        for item in inventory:
+            name = item.get("item_name")
+            cat = item.get("category", "")
+            qty = item.get("quantity", 0)
+            u = item.get("unit", "")
+            act = item.get("active_ingredient") or ""
+            inv_desc.append(f"- {name} ({cat}): {qty} {u} available" + (f" [Active: {act}]" if act else ""))
+        prompt_lines.append("Farmer's Available Inventory in Shed:\n" + "\n".join(inv_desc))
+    else:
+        prompt_lines.append("Farmer's Available Inventory in Shed: [Empty / None listed]")
+
+    prompt_lines.append(
+        "Analyze whether any of the farmer's stored chemicals/fertilizers match this disease. "
+        "Calculate the exact dosage and water volume needed for their specific plot area. "
+        "If not available in their shed, state what to purchase at the nearest local agro market."
     )
+    prompt = "\n".join(prompt_lines)
 
     last_error = None
     for model_name in ADVISORY_MODELS:
         try:
-            # Try with structured json object format
             response = client.chat.completions.create(
                 model=model_name,
                 messages=[
@@ -213,6 +271,7 @@ async def get_disease_advisory(disease: str, severity: str, confidence: float) -
     )
 
 
+
 async def chat_with_ai(message: str, history: list = None, language: str = "en") -> str:
     """Chat with AI assistant about agriculture topics using Groq LLM with native language support."""
     client = _get_client()
@@ -229,6 +288,13 @@ async def chat_with_ai(message: str, history: list = None, language: str = "en")
                 f"you MUST ALWAYS use the standard authentic Odia word 'ବିହନ' (Bihana). "
                 f"NEVER write 'ବିଆ' or 'ବୀଜ'. Always use 'ବିହନ' (for example: 'ବିହନ ଚୟନ' for seed selection, "
                 f"'ବିହନ ବିଶୋଧନ' for seed treatment, and 'ଉନ୍ନତ ବିହନ' for high-quality seeds)."
+                f"\n- NATURAL ODIA PUNCTUATION & TTS AUDIO RULES (CRITICAL):"
+                f"\n  1. Every single sentence MUST end with the authentic Odia full stop / Purna Viram ('।') or exclamation ('!'). Never end sentences with English dots ('.') and never leave sentences unpunctuated."
+                f"\n  2. Use commas (',') between clauses, conditions, and items so the voice reader takes natural breathing pauses."
+                f"\n  3. Every bullet point or numbered item MUST be a complete, grammatically sound sentence ending with a Purna Viram ('।')."
+                f"\n  4. PURE ODIA SCRIPT ONLY: Do NOT write English words in Latin alphabet inside Odia sentences. NEVER add parenthetical translations like 'ବିହନ (seed)' or 'ସ୍ପ୍ରେ (spray)'. Write only the Odia terms."
+                f"\n  5. For modern agricultural terms or chemical names, transliterate them phonetically into Odia script (e.g., 'ସ୍ପ୍ରେ', 'ଫଙ୍ଗିସାଇଡ୍', 'ନାଇଟ୍ରୋଜେନ୍', 'ପୋଟାସ୍', 'ଲିଟର', 'ଏକର', 'ମାନ୍କୋଜେବ୍')."
+                f"\n  6. Keep the sentence structure clean, rhythmic, and natural for an Odia farmer listening to audio."
             )
 
     messages = [{"role": "system", "content": system_prompt}]

@@ -98,5 +98,9 @@ desktop.ini
 *.ntvs*
 *.njsproj
 *.sln
-*.sw?
 .claude/
+.gemini/
+.agents/
+.supermaven/
+*.env.local
+*.env.*.local

@@ -1,6 +1,8 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { useSearchParams, Link } from "react-router-dom";
 import { useDropzone } from "react-dropzone";
 import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
 import LanguageSelector from "../components/LanguageSelector";
 import {
   Upload,
@@ -15,6 +17,11 @@ import {
   Sprout,
   Volume2,
   BarChart3,
+  MapPin,
+  Package,
+  ShoppingCart,
+  ShieldCheck,
+  CheckCircle2,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -22,12 +29,52 @@ const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export default function Scanner() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [lang, setLang] = useState("en");
   const [translatedAdvisory, setTranslatedAdvisory] = useState(null);
+
+  // Farm Plots state
+  const [plots, setPlots] = useState([]);
+  const [selectedPlotId, setSelectedPlotId] = useState(searchParams.get("plotId") || "");
+
+  useEffect(() => {
+    async function loadPlots() {
+      if (!user?.id) return;
+      try {
+        const { data, error } = await supabase
+          .from("farm_plots")
+          .select("*")
+          .eq("user_id", user.id);
+        if (!error && data && data.length > 0) {
+          setPlots(data);
+          const fromParam = searchParams.get("plotId");
+          if (fromParam) {
+            setSelectedPlotId(fromParam);
+          } else if (!selectedPlotId) {
+            setSelectedPlotId(data[0].id);
+          }
+        } else {
+          // Fallback to local storage
+          const local = localStorage.getItem(`agrointel_plots_${user.id}`);
+          if (local) {
+            const parsed = JSON.parse(local);
+            setPlots(parsed);
+            const fromParam = searchParams.get("plotId");
+            if (fromParam) setSelectedPlotId(fromParam);
+            else if (!selectedPlotId && parsed.length > 0) setSelectedPlotId(parsed[0].id);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load plots in scanner:", err);
+      }
+    }
+    loadPlots();
+  }, [user?.id, searchParams]);
+
 
   const onDrop = useCallback((accepted) => {
     if (accepted.length > 0) {
@@ -56,6 +103,10 @@ export default function Scanner() {
     try {
       const headers = {};
       if (user?.id) headers["X-User-Id"] = user.id;
+      if (selectedPlotId) {
+        formData.append("plot_id", selectedPlotId);
+        headers["X-Plot-Id"] = selectedPlotId;
+      }
 
       // Try API URL first, fallback to relative path
       let res;
@@ -157,12 +208,12 @@ export default function Scanner() {
     <div className="min-h-[calc(100vh-4rem)] bg-[#0a0f0d] px-4 pt-6 pb-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="font-[Outfit] text-3xl font-bold text-white mb-1">
               🔬 Disease Scanner
             </h1>
-            <p className="text-gray-400 text-sm">Upload a leaf image to detect diseases</p>
+            <p className="text-gray-400 text-sm">Upload a leaf image to detect diseases & get personalized prescriptions</p>
           </div>
           <LanguageSelector
             currentLang={lang}
@@ -171,6 +222,48 @@ export default function Scanner() {
             speakText={result?.advisory}
           />
         </div>
+
+        {/* Target Plot Selector */}
+        {!result && (
+          <div className="glass-card p-4 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-[#23352c] animate-fade-in">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                <MapPin className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
+                  Target Farm Plot (Optional)
+                </p>
+                <p className="text-sm font-medium text-white">
+                  Calculate exact spray dosage tailored to your plot area
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedPlotId}
+                onChange={(e) => setSelectedPlotId(e.target.value)}
+                className="input-field py-2 px-3 text-sm bg-[#0e1612] min-w-[220px]"
+              >
+                <option value="">General Scan (1 Acre standard)</option>
+                {plots.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.plot_name} ({p.area} {p.area_unit || "Acres"} - {p.crop})
+                  </option>
+                ))}
+              </select>
+              <Link
+                to="/farm"
+                className="p-2 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-emerald-400 text-xs font-medium border border-white/5 whitespace-nowrap transition-colors"
+                title="Manage Farm Plots"
+              >
+                + Plots
+              </Link>
+            </div>
+          </div>
+        )}
+
 
         {!result ? (
           /* ── Upload Section ────────────────────────────────────────────── */
@@ -295,8 +388,100 @@ export default function Scanner() {
               const displayText = translatedAdvisory || result.advisory;
 
               if (advisory) {
+                const pres = advisory.personalized_prescription;
+                const targetPlot = plots.find((p) => p.id === selectedPlotId) || result.plot_info;
+
                 return (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {/* Personalized Farm Prescription Card */}
+                    {pres && (
+                      <div
+                        className={`col-span-1 md:col-span-2 glass-card p-6 border transition-all ${
+                          pres.has_in_stock_remedy
+                            ? "border-emerald-500/50 bg-gradient-to-br from-emerald-950/30 via-[#111916] to-[#111916] shadow-lg shadow-emerald-500/10"
+                            : "border-amber-500/40 bg-gradient-to-br from-amber-950/25 via-[#111916] to-[#111916]"
+                        }`}
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`w-11 h-11 rounded-2xl border flex items-center justify-center ${
+                                pres.has_in_stock_remedy
+                                  ? "bg-emerald-500/20 border-emerald-500/30 text-emerald-400"
+                                  : "bg-amber-500/20 border-amber-500/30 text-amber-400"
+                              }`}
+                            >
+                              {pres.has_in_stock_remedy ? (
+                                <ShieldCheck className="w-6 h-6" />
+                              ) : (
+                                <ShoppingCart className="w-6 h-6" />
+                              )}
+                            </div>
+                            <div>
+                              <span
+                                className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                                  pres.has_in_stock_remedy
+                                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                                    : "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                                }`}
+                              >
+                                {pres.has_in_stock_remedy
+                                  ? "🟢 In-Stock Medicine Match • Money Saved"
+                                  : "🛒 Local Market Purchase Needed"}
+                              </span>
+                              <h3 className="font-[Outfit] text-xl font-bold text-white mt-1">
+                                {pres.has_in_stock_remedy
+                                  ? "Personalized Plot Treatment Plan"
+                                  : "Recommended Commercial Remedy"}
+                              </h3>
+                            </div>
+                          </div>
+
+                          {targetPlot && (
+                            <div className="text-right text-xs bg-black/30 px-3 py-1.5 rounded-xl border border-white/5">
+                              <p className="text-gray-400">Prescribed For:</p>
+                              <p className="text-emerald-300 font-semibold">
+                                {targetPlot.plot_name} ({targetPlot.area} {targetPlot.area_unit || "Acres"})
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Matched Items Pills */}
+                        {pres.has_in_stock_remedy && pres.matched_items?.length > 0 && (
+                          <div className="flex items-center gap-2 flex-wrap mb-3">
+                            <span className="text-xs text-gray-400 font-semibold">Use Stored Resource:</span>
+                            {pres.matched_items.map((item, idx) => (
+                              <span
+                                key={idx}
+                                className="text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                {item}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Prescribed Instructions */}
+                        <div className="p-4 rounded-xl bg-[#080d0a] border border-[#1f2d26] text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">
+                          {pres.has_in_stock_remedy
+                            ? pres.in_stock_instructions
+                            : pres.market_recommendation}
+                        </div>
+
+                        <div className="mt-3 flex items-center justify-between text-xs text-gray-400">
+                          <span className="flex items-center gap-1">
+                            <Package className="w-3.5 h-3.5 text-emerald-400" />
+                            Connected with your shed inventory
+                          </span>
+                          <Link to="/inventory" className="text-emerald-400 hover:text-emerald-300 font-medium underline">
+                            Manage Inventory
+                          </Link>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Cause & Symptoms */}
                     <div className="glass-card p-6">
                       <div className="flex items-center gap-2 mb-4">
